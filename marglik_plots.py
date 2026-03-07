@@ -54,7 +54,7 @@ def produce_paper_toy_plots(name):
     ax1.legend(loc=(0.10, 0.78))
     ax1.set_ylabel('MSE')
     ax1.set_ylim(ylim)
-    ax1.set_xlabel('hyperparameter $\delta$')
+    ax1.set_xlabel(r'hyperparameter $\delta$')
     ax1.set_xlim(xlim)
     ax1.set_yticks([0.1, 0.2, 0.3])
 
@@ -89,19 +89,19 @@ def produce_paper_toy_plots(name):
     testlosses = testvi.mean(axis=1)
     m, s = trainvi.mean(axis=1), trainvi.std(axis=1)/div
     ax1.fill_between(deltas, m-s, m+s, color='gray', alpha=0.15)
-    m, s = testvi.mean(axis=1), testmap.std(axis=1)/div
+    m, s = testvi.mean(axis=1), testvi.std(axis=1)/div
     ax1.fill_between(deltas, m-s, m+s, color='gray', alpha=0.15)
     ax1.legend(loc=(0.09, 0.78))
     ax1.set_ylabel('MSE')
     ax1.set_ylim(ylim)
-    ax1.set_xlabel('hyperparameter $\delta$')
+    ax1.set_xlabel(r'hyperparameter $\delta$')
     ax1.set_xlim(xlim)
     ax1.set_yticks([0.1, 0.2, 0.3, 0.4])
     ax2 = ax1.twinx()
     ylim = [107, 143]
 
     ax2.plot(deltas, -vimlhs.mean(axis=1), color=vlap, label='Train MargLik', linewidth=3, zorder=1)
-    m, s = -vimlhs.mean(axis=1), -mlhs.std(axis=1)/div
+    m, s = -vimlhs.mean(axis=1), -vimlhs.std(axis=1)/div
     ax2.fill_between(deltas, m-s, m+s, color=vlap, alpha=0.15)
     lhss = -vimlhs.mean(axis=1)
     ax2.grid(False)
@@ -120,7 +120,10 @@ def produce_paper_toy_plots(name):
 
 
     '''Fits to the data with various deltas for insight on the type of fit.'''
-    ixs = [0, 9, -4]
+    if len(deltas) >= 10:
+        ixs = [0, 9, -4]
+    else:
+        ixs = [0, max(len(deltas) // 2, 0), -1]
     x, y = res['datasets'][0]['x'], res['datasets'][0]['y']
     xt, yt = res['datasets'][0]['x_train'], res['datasets'][0]['y_train']
     fig, axs = plt.subplots(3, 1, figsize=(4, 4), sharex=True)
@@ -130,7 +133,7 @@ def produce_paper_toy_plots(name):
     fm, fstd = res['results'][i]['fits'][0]['map'], res['results'][i]['fits'][0]['gpcov']
     ax.plot(x[:, 0], fm, label='Laplace-GP', color=clap)
     ax.fill_between(x[:, 0], fm+fstd, fm-fstd, alpha=0.3, color=clap)
-    ax.annotate('$\delta={delta:.2f}$'.format(delta=deltas[i]), xy=(-2.5, 1))
+    ax.annotate(r'$\delta={delta:.2f}$'.format(delta=deltas[i]), xy=(-2.5, 1))
 
     ax, i = axs[1], ixs[1]
     ax.set_ylabel('y')
@@ -138,7 +141,7 @@ def produce_paper_toy_plots(name):
     fm, fstd = res['results'][i]['fits'][0]['map'], res['results'][i]['fits'][0]['gpcov']
     ax.plot(x[:, 0], fm, label='MAP', color=clap)
     ax.fill_between(x[:, 0], fm+fstd, fm-fstd, alpha=0.3, color=clap)
-    ax.annotate('$\delta={delta:.2f}$'.format(delta=deltas[i]), xy=(-2.5, 1))
+    ax.annotate(r'$\delta={delta:.2f}$'.format(delta=deltas[i]), xy=(-2.5, 1))
 
 
     ax, i = axs[2], ixs[2]
@@ -146,7 +149,7 @@ def produce_paper_toy_plots(name):
     fm, fstd = res['results'][i]['fits'][0]['map'], res['results'][i]['fits'][0]['gpcov']
     ax.plot(x[:, 0], fm, label='MAP', color=clap)
     ax.fill_between(x[:, 0], fm+fstd, fm-fstd, alpha=0.3, color=clap)
-    ax.annotate('$\delta={delta:.2f}$'.format(delta=deltas[i]), xy=(-2.5, 1))
+    ax.annotate(r'$\delta={delta:.2f}$'.format(delta=deltas[i]), xy=(-2.5, 1))
     ax.set_xlabel('x')
 
     plt.tight_layout()
@@ -277,11 +280,12 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='Model selection experiment with result saving and MP.')
     parser.add_argument('--name', type=str, required=True)
+    parser.add_argument('--mode', type=str, default='toy', choices=['toy', 'toy_extra', 'uci'])
     args = parser.parse_args()
     name = args.name
-    # delta on the toy data set with Laplace and VI (used in paper)
-    # produce_paper_toy_plots(name)
-    # width and depth on the toy data set with Laplace and VI (not in paper)
-    # produce_additional_toy_plots(name)
-    # width, delta and sigma on wine dataset with Laplace
-    produce_paper_uci_plots('wine')
+    if args.mode == 'toy':
+        produce_paper_toy_plots(name)
+    elif args.mode == 'toy_extra':
+        produce_additional_toy_plots(name)
+    elif args.mode == 'uci':
+        produce_paper_uci_plots(name)

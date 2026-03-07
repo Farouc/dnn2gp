@@ -2,9 +2,14 @@ import numpy as np
 import torch
 from torch.distributions import Normal
 
-from neural_networks import SimpleMLP
-from vogn import VOGN
-from dual_models import DualGPRegression
+try:
+    from .neural_networks import SimpleMLP
+    from .vogn import VOGN
+    from .dual_models import DualGPRegression
+except ImportError:
+    from neural_networks import SimpleMLP
+    from vogn import VOGN
+    from dual_models import DualGPRegression
 
 
 class VariationalNeuralRegression:

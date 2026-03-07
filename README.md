@@ -102,3 +102,19 @@ Outputs:
 - `figures/marglik_delta_toy_VI.pdf`
 - `figures/marglik_delta_toy_fits.pdf`
 - `figures/marglik_width_toy_laplace.pdf`
+
+Paper-scale (very long on CPU):
+
+```bash
+python marglik.py \
+  --name repro_full \
+  --mode all \
+  --n_retries 10 \
+  --n_params 21 \
+  --width_n_params 30 \
+  --width_log_max 3.0 \
+  --n_epochs 10000 \
+  --vi_epochs 5000 \
+  --n_processes 0 \
+  --seed 7
+```

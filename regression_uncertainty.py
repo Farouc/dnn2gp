@@ -203,6 +203,15 @@ def main():
         output_dir = PROJECT_ROOT / output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    print(
+        "Running regression_uncertainty with "
+        f"laplace_epochs={args.laplace_epochs}, "
+        f"vi_epochs={args.vi_epochs}, "
+        f"laplace_pred_samples={args.laplace_pred_samples}, "
+        f"vi_pred_samples={args.vi_pred_samples}, "
+        f"gp_restarts={args.gp_restarts}, seed={args.seed}"
+    )
+
     snelson_data = load_snelson_data(data_dir=data_dir, n=args.n_train)
     X_snelson, y_snelson = snelson_data.train_x, snelson_data.train_y.reshape((-1,))
     X_test_snelson = np.linspace(-4, 10, 1000).reshape((-1, 1))

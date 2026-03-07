@@ -114,7 +114,7 @@ class VOGN(Optimizer):
         pred_list = []
         for _ in range(defaults['num_samples']):
             raw_noise = torch.normal(mean=torch.zeros_like(mu), std=1.0)
-            p = torch.addcdiv(mu, 1., raw_noise, torch.sqrt(precision))
+            p = torch.addcdiv(mu, raw_noise, torch.sqrt(precision), value=1.0)
             vector_to_parameters(p, parameters)
 
             #loss, preds = closure()
@@ -187,10 +187,10 @@ class VOGN(Optimizer):
 
         grad_hat = grad_hat.mul(defaults['train_set_size'] / defaults['num_samples'])
         ggn_hat.mul_(defaults['train_set_size'] / defaults['num_samples'])
-        momentum.mul_(momentum_beta).add_((1 - momentum_beta), grad_hat)
+        momentum.mul_(momentum_beta).add_(grad_hat, alpha=(1 - momentum_beta))
         loss = torch.mean(torch.stack(loss_list))
-        precision.mul_(beta).add_((1 - beta), ggn_hat + prior_prec)
-        mu.addcdiv_(-lr, momentum + torch.mul(mu - prior_mu, prior_prec), precision)
+        precision.mul_(beta).add_(ggn_hat + prior_prec, alpha=(1 - beta))
+        mu.addcdiv_(momentum + torch.mul(mu - prior_mu, prior_prec), precision, value=-lr)
         vector_to_parameters(self.state['mu'], self.param_groups[0]['params'])
 
         return loss, pred_list
@@ -222,7 +222,7 @@ class VOGN(Optimizer):
         mu = self.state['mu']
         for _ in range(mc_samples):
             raw_noise = torch.normal(mean=torch.zeros_like(mu), std=1.0)
-            p = torch.addcdiv(mu, 1., raw_noise, torch.sqrt(precision))
+            p = torch.addcdiv(mu, raw_noise, torch.sqrt(precision), value=1.0)
             vector_to_parameters(p, parameters)
             outputs = forward_function(inputs, *args, **kwargs).detach()
             if ret_numpy:
@@ -254,7 +254,7 @@ class VOGN(Optimizer):
         parameters = self.param_groups[0]['params']
         if sample:
             raw_noise = torch.normal(mean=torch.zeros_like(mu_t), std=1.0)
-            p = torch.addcdiv(mu_t, 1., raw_noise, torch.sqrt(p_t))
+            p = torch.addcdiv(mu_t, raw_noise, torch.sqrt(p_t), value=1.0)
             vector_to_parameters(p, parameters)
         else:
             vector_to_parameters(mu_t, parameters)
@@ -280,7 +280,7 @@ class VOGN(Optimizer):
             precision = self.state['precision']
             mu = self.state['mu']
             raw_noise = torch.normal(mean=torch.zeros_like(mu), std=1.0)
-            m_t = torch.addcdiv(mu, 1., raw_noise, torch.sqrt(precision))
+            m_t = torch.addcdiv(mu, raw_noise, torch.sqrt(precision), value=1.0)
             m_t = m_t.detach().numpy()
         return Us, vs, m_t, np.zeros_like(m_t), s_0
 
@@ -294,7 +294,7 @@ class VOGN(Optimizer):
         for _ in range(mc_samples):
             # Sample a parameter vector:
             raw_noise = torch.normal(mean=torch.zeros_like(mu), std=1.0)
-            p = torch.addcdiv(mu, 1., raw_noise, torch.sqrt(precision))
+            p = torch.addcdiv(mu, raw_noise, torch.sqrt(precision), value=1.0)
             vector_to_parameters(p, parameters)
 
             # Get loss and predictions
@@ -325,7 +325,7 @@ class VOGN(Optimizer):
         for _ in range(mc_samples):
             # Sample a parameter vector:
             raw_noise = torch.normal(mean=torch.zeros_like(mu), std=1.0)
-            p = torch.addcdiv(mu_prev, 1., raw_noise, torch.sqrt(prec_prev))
+            p = torch.addcdiv(mu_prev, raw_noise, torch.sqrt(prec_prev), value=1.0)
             vector_to_parameters(p, parameters)
 
             # Get loss and predictions
@@ -399,7 +399,7 @@ class VOGGN(VOGN):
         for _ in range(defaults['num_samples']):
             # Sample a parameter vector:
             raw_noise = torch.normal(mean=torch.zeros_like(mu), std=1.0)
-            p = torch.addcdiv(mu, 1., raw_noise, torch.sqrt(precision))
+            p = torch.addcdiv(mu, raw_noise, torch.sqrt(precision), value=1.0)
             vector_to_parameters(p, parameters)
 
             # Get loss and predictions
@@ -445,15 +445,15 @@ class VOGGN(VOGN):
         ggn_hat.mul_(defaults['train_set_size'] / defaults['num_samples'])
 
         # Add momentum
-        momentum.mul_(momentum_beta).add_((1 - momentum_beta), grad_hat)
+        momentum.mul_(momentum_beta).add_(grad_hat, alpha=(1 - momentum_beta))
 
         # Get the mean loss over the number of samples
         loss = torch.mean(torch.stack(loss_list))
 
         # Update precision matrix
-        precision.mul_(beta).add_((1 - beta), ggn_hat + prior_prec)
+        precision.mul_(beta).add_(ggn_hat + prior_prec, alpha=(1 - beta))
         # Update mean vector
-        mu.addcdiv_(-lr, momentum + torch.mul(mu - prior_mu, prior_prec), precision)
+        mu.addcdiv_(momentum + torch.mul(mu - prior_mu, prior_prec), precision, value=-lr)
         # Update model parameters
         vector_to_parameters(self.state['mu'], self.param_groups[0]['params'])
 

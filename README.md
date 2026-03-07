@@ -118,3 +118,86 @@ python marglik.py \
   --n_processes 0 \
   --seed 7
 ```
+
+## Results Folder Inventory (March 8, 2026)
+
+This section lists the experiments that already have artifacts in `results/`.
+
+### A) DNN2GP kernel/predictive arrays (MNIST/CIFAR)
+
+Generating script:
+
+```bash
+python kernel_and_predictive.py
+```
+
+Current files:
+- `results/BIN_MNIST_VI_gp_predictive_mean.npy` (`300 x 2`)
+- `results/BIN_MNIST_VI_kernel.npy` (`300 x 300`)
+- `results/MNIST_Laplace_gp_predictive_mean.npy` (`300 x 10`)
+- `results/MNIST_Laplace_predictive_mean.npy` (`300 x 10`)
+- `results/MNIST_Laplace_predictive_var_f.npy` (`300 x 10`, epistemic)
+- `results/MNIST_Laplace_predictive_noise.npy` (`300 x 10`, aleatoric)
+- `results/MNIST_Laplace_kernel.npy` (`300 x 300`)
+- `results/MNIST_VI_gp_predictive_mean.npy` (`300 x 10`)
+- `results/MNIST_VI_kernel.npy` (`300 x 300`)
+- `results/CIFAR_Laplace_gp_predictive_mean.npy` (`300 x 10`)
+- `results/CIFAR_Laplace_predictive_mean.npy` (`300 x 10`)
+- `results/CIFAR_Laplace_predictive_var_f.npy` (`300 x 10`, epistemic)
+- `results/CIFAR_Laplace_predictive_noise.npy` (`300 x 10`, aleatoric)
+- `results/CIFAR_Laplace_kernel.npy` (`300 x 300`)
+- `results/CIFAR_VI_gp_predictive_mean.npy` (`300 x 10`)
+- `results/CIFAR_VI_kernel.npy` (`300 x 300`)
+
+### B) Marglik hyperparameter tuning (toy regression)
+
+Generating script:
+
+```bash
+python marglik.py --name <run_name> --mode all ...
+```
+
+Current files:
+- `results/reg_ms_delta_smoke_marglik.pkl` (smoke delta sweep, 2 parameter values)
+- `results/reg_ms_width_smoke_marglik.pkl` (smoke width sweep, 2 parameter values)
+- `results/reg_ms_delta_repro_fast.pkl` (repro fast delta sweep, 21 parameter values)
+- `results/reg_ms_width_repro_fast.pkl` (repro fast width sweep, 18 parameter values)
+
+Each PKL contains:
+- `datasets`: sampled train/test toy datasets
+- `params`: sweep values
+- `results`: metrics per parameter (marginal likelihoods, losses, fitted curves)
+
+### C) VOGN small-dataset regression comparison
+
+Generating script:
+
+```bash
+python vogn_small_datasets_experiments.py --output-dir figures --results-dir results
+```
+
+Current file:
+- `results/vogn_small_datasets_metrics.json`
+
+Contains per-dataset metrics for `gap_sine`, `hetero_sine`, and `cubic`:
+- training size, noise level
+- mean/median predictive variance
+
+### D) Scaling experiment (posterior variance vs dataset size, non-VOGN)
+
+Generating script:
+
+```bash
+python laplace_variance_scaling_experiment.py --output-dir figures --results-dir results
+```
+
+Current file:
+- `results/laplace_scaling_metrics.csv`
+
+Columns:
+- `scale`, `n_train`, `method`, `epochs`
+- `mean_var_all`, `mean_var_center`, `std_var_all`
+
+Methods in this CSV:
+- `laplace_j`
+- `dual_blr_diag`

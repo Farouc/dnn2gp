@@ -1,0 +1,27 @@
+{
+  "device": "cuda",
+  "seed": 42,
+  "datasets": [
+    {
+      "dataset": "gap_sine",
+      "n_train": 120,
+      "sigma_noise": 0.14,
+      "mean_predictive_var": 0.0013998165469826878,
+      "median_predictive_var": 0.0008116128764434536
+    },
+    {
+      "dataset": "hetero_sine",
+      "n_train": 120,
+      "sigma_noise": 0.1,
+      "mean_predictive_var": 0.00023160368595807573,
+      "median_predictive_var": 0.00019803094038996373
+    },
+    {
+      "dataset": "cubic",
+      "n_train": 120,
+      "sigma_noise": 0.24,
+      "mean_predictive_var": 0.009354269596228672,
+      "median_predictive_var": 0.002415909072894417
+    }
+  ]
+}

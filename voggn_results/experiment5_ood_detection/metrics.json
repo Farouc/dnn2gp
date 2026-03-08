@@ -1,18 +1,18 @@
 {
   "VOGN": {
-    "auroc_entropy": 0.9260940669371197,
-    "auroc_predictive_variance": 0.9211511156186613,
-    "mean_entropy_seen": 0.010228507270989687,
-    "mean_entropy_unseen": 0.248364744562606,
-    "mean_var_seen": 0.0034078517957272956,
-    "mean_var_unseen": 0.10744353530226533
+    "auroc_entropy": 0.9475335953346856,
+    "auroc_predictive_variance": 0.945767621703854,
+    "mean_entropy_seen": 0.003616822309582369,
+    "mean_entropy_unseen": 0.23261136981756675,
+    "mean_var_seen": 0.0010810415566944603,
+    "mean_var_unseen": 0.10149338672418254
   },
   "OGGN": {
-    "auroc_entropy": 0.9541772312373226,
-    "auroc_predictive_variance": 0.9488913539553753,
-    "mean_entropy_seen": 0.013960255199360432,
-    "mean_entropy_unseen": 0.3043610552330308,
-    "mean_var_seen": 0.003211127649622526,
-    "mean_var_unseen": 0.07528529557033165
+    "auroc_entropy": 0.9505514705882353,
+    "auroc_predictive_variance": 0.94786130831643,
+    "mean_entropy_seen": 0.005786452091241246,
+    "mean_entropy_unseen": 0.2601905059659474,
+    "mean_var_seen": 0.0012125906034016057,
+    "mean_var_unseen": 0.09964137633381827
   }
 }

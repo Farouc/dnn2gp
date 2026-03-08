@@ -9,20 +9,21 @@ from pathlib import Path
 import numpy as np
 import torch
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, Subset
+from torch.utils.data import DataLoader
 
 from experiments_vogn.compute_gp_predictions import (
+    gp_predictive_distribution,
     gp_classification_from_qstate,
-    gp_regression_from_qstate,
 )
 from experiments_vogn.compute_kernels import (
+    assign_parameters_from_vector,
     compute_jacobian,
     compute_ntk_kernel,
     compute_oggn_kernel,
     compute_vogn_kernel,
     precision_to_cov_diag,
 )
-from experiments_vogn.compute_mc_predictions import mc_predict
+from experiments_vogn.compute_mc_predictions import mc_predict, sample_weights_from_q
 from experiments_vogn.plotting_utils import (
     plot_calibration_curve,
     plot_gp_vs_mc,
@@ -121,6 +122,78 @@ def loader_to_tensors(loader: DataLoader, device: torch.device, dtype: torch.dty
     return torch.cat(xs, dim=0), torch.cat(ys, dim=0)
 
 
+def conditioned_gp_regression_from_qstate(
+    model: SmallMLP,
+    q_state: dict[str, torch.Tensor],
+    x_train: torch.Tensor,
+    y_train: torch.Tensor,
+    x_test: torch.Tensor,
+    noise_var: float = 0.02,
+) -> dict[str, torch.Tensor]:
+    with torch.no_grad():
+        mean_train = model(x_train).flatten()
+        mean_test = model(x_test).flatten()
+
+    J_train = compute_jacobian(model, x_train).squeeze(1)
+    J_test = compute_jacobian(model, x_test).squeeze(1)
+    cov_diag = precision_to_cov_diag(q_state["precision"])
+
+    gp_mean, gp_var, _ = gp_predictive_distribution(
+        J_test=J_test,
+        J_train=J_train,
+        Sigma=cov_diag,
+        y_train=y_train,
+        noise_var=noise_var,
+        mean_train=mean_train,
+        mean_test=mean_test,
+    )
+    K_tt = torch.einsum("np,p,mp->nm", J_train, cov_diag, J_train)
+    K_st = torch.einsum("np,p,mp->nm", J_test, cov_diag, J_train)
+    eye = torch.eye(K_tt.shape[0], dtype=K_tt.dtype, device=K_tt.device)
+    A = K_tt + noise_var * eye
+    return {
+        "mean": gp_mean,
+        "var": gp_var,
+        "mean_train": mean_train,
+        "mean_test": mean_test,
+        "K_st": K_st,
+        "A": A,
+    }
+
+
+def conditioned_mc_regression_predict(
+    model: SmallMLP,
+    q_state: dict[str, torch.Tensor],
+    x_train: torch.Tensor,
+    y_train: torch.Tensor,
+    x_test: torch.Tensor,
+    K_st: torch.Tensor,
+    A: torch.Tensor,
+    mc_samples: int = 80,
+    seed: int = 0,
+) -> dict[str, np.ndarray]:
+    mu = q_state["mu"].to(device=x_test.device, dtype=x_test.dtype)
+    precision = q_state["precision"].to(device=x_test.device, dtype=x_test.dtype)
+    weight_samples = sample_weights_from_q(mu=mu, precision=precision, n_samples=mc_samples, seed=seed)
+
+    preds = []
+    with torch.no_grad():
+        for w in weight_samples:
+            assign_parameters_from_vector(model, w)
+            m_train = model(x_train).flatten()
+            m_test = model(x_test).flatten()
+            alpha = torch.linalg.solve(A, y_train - m_train)
+            preds.append(m_test + K_st @ alpha)
+
+    assign_parameters_from_vector(model, mu)
+    pred_samples = torch.stack(preds, dim=0)
+    return {
+        "mean": pred_samples.mean(dim=0).cpu().numpy(),
+        "var": pred_samples.var(dim=0).clamp_min(1e-12).cpu().numpy(),
+        "samples": pred_samples.cpu().numpy(),
+    }
+
+
 def train_regression_deterministic(
     optimizer_name: str,
     model: SmallMLP,
@@ -213,9 +286,16 @@ def experiment1_gp_evolution(root: Path, device: torch.device, seed: int) -> tup
     (exp_dir / "vogn").mkdir(parents=True, exist_ok=True)
     (exp_dir / "oggn").mkdir(parents=True, exist_ok=True)
 
-    data = make_toy_regression_dataset(seed=seed)
+    data = make_toy_regression_dataset(
+        n_train=200,
+        n_val=80,
+        n_test=320,
+        seed=seed,
+        noise_std=0.08,
+    )
     train_loader, val_loader, test_loader = toy_regression_loaders(data, batch_size=32)
-    checkpoint_steps = [0, 10, 50, 100, 200, 500]
+    checkpoint_steps = [0, 100, 250, 500, 1000, 1750, 2500]
+    gp_noise_var = 0.02
 
     vogn_model = SmallMLP(1, 1, hidden_units=32, n_hidden_layers=2, activation="tanh")
     oggn_model = SmallMLP(1, 1, hidden_units=32, n_hidden_layers=2, activation="tanh")
@@ -226,14 +306,14 @@ def experiment1_gp_evolution(root: Path, device: torch.device, seed: int) -> tup
         val_loader=val_loader,
         test_loader=test_loader,
         device=device,
-        total_steps=500,
+        total_steps=2500,
         checkpoint_steps=checkpoint_steps,
-        lr=0.05,
+        lr=0.03,
         prior_prec=1.0,
         initial_prec=20.0,
         beta2=0.99,
         num_samples=6,
-        eval_interval=10,
+        eval_interval=50,
     )
     oggn_res = train_regression_oggn(
         model=oggn_model,
@@ -241,16 +321,19 @@ def experiment1_gp_evolution(root: Path, device: torch.device, seed: int) -> tup
         val_loader=val_loader,
         test_loader=test_loader,
         device=device,
-        total_steps=500,
+        total_steps=2500,
         checkpoint_steps=checkpoint_steps,
-        lr=0.05,
+        lr=0.03,
         prior_prec=1.0,
         initial_prec=20.0,
         beta2=0.99,
         num_samples=6,
-        eval_interval=10,
+        eval_interval=50,
     )
 
+    x_train_t = data["x_train"].to(device)
+    y_train_t = data["y_train"].to(device)
+    y_test_t = data["y_test"].to(device)
     x_test = data["x_test"].to(device)
     x_train_np = data["x_train"].cpu().numpy().squeeze()
     y_train_np = data["y_train"].cpu().numpy().squeeze()
@@ -262,9 +345,17 @@ def experiment1_gp_evolution(root: Path, device: torch.device, seed: int) -> tup
         for step in checkpoint_steps:
             snap = res["checkpoints"][step]
             model_step, q_state = load_snapshot_into_model(snap, input_dim=1, output_dim=1, device=device)
-            gp_out = gp_regression_from_qstate(model_step, x_test, q_state)
-            mean = gp_out["mean"]
-            var = gp_out["var"]
+            gp_out = conditioned_gp_regression_from_qstate(
+                model=model_step,
+                q_state=q_state,
+                x_train=x_train_t,
+                y_train=y_train_t,
+                x_test=x_test,
+                noise_var=gp_noise_var,
+            )
+            mean = gp_out["mean"].detach().cpu().numpy()
+            var = gp_out["var"].detach().cpu().numpy()
+            test_mse = float(torch.mean((gp_out["mean"] - y_test_t) ** 2).item())
 
             np.savez(
                 opt_dir / f"gp_step_{step:03d}.npz",
@@ -280,19 +371,21 @@ def experiment1_gp_evolution(root: Path, device: torch.device, seed: int) -> tup
                 x_test=x_test_np,
                 mean=mean,
                 var=var,
-                title=f"{name} GP evolution (step {step})",
+                title=f"{name} posterior GP evolution (step {step})",
                 path=opt_dir / f"mean_variance_step_{step:03d}.png",
             )
             metrics[name][f"step_{step}"] = {
                 "mean_abs_mean": float(np.mean(np.abs(mean))),
                 "mean_var": float(np.mean(var)),
                 "max_var": float(np.max(var)),
+                "test_mse_posterior_mean": test_mse,
             }
 
     save_json(exp_dir / "metrics.json", metrics)
     return metrics, {
         "data": data,
         "checkpoint_steps": checkpoint_steps,
+        "gp_noise_var": gp_noise_var,
         "vogn": vogn_res,
         "oggn": oggn_res,
     }
@@ -313,14 +406,14 @@ def experiment2_optimizer_comparison(root: Path, device: torch.device, seed: int
         val_loader=va_reg,
         test_loader=te_reg,
         device=device,
-        total_steps=250,
-        checkpoint_steps=[0, 250],
-        lr=0.05,
+        total_steps=1500,
+        checkpoint_steps=[0, 250, 500, 1000, 1500],
+        lr=0.03,
         prior_prec=1.0,
         initial_prec=20.0,
         beta2=0.99,
         num_samples=4,
-        eval_interval=10,
+        eval_interval=25,
     )
     reg_hist["OGGN"] = train_regression_oggn(
         model=SmallMLP(1, 1, hidden_units=32, n_hidden_layers=2, activation="tanh"),
@@ -328,14 +421,14 @@ def experiment2_optimizer_comparison(root: Path, device: torch.device, seed: int
         val_loader=va_reg,
         test_loader=te_reg,
         device=device,
-        total_steps=250,
-        checkpoint_steps=[0, 250],
-        lr=0.05,
+        total_steps=1500,
+        checkpoint_steps=[0, 250, 500, 1000, 1500],
+        lr=0.03,
         prior_prec=1.0,
         initial_prec=20.0,
         beta2=0.99,
         num_samples=4,
-        eval_interval=10,
+        eval_interval=25,
     )
     reg_hist["Adam"] = train_regression_deterministic(
         optimizer_name="Adam",
@@ -344,9 +437,9 @@ def experiment2_optimizer_comparison(root: Path, device: torch.device, seed: int
         val_loader=va_reg,
         test_loader=te_reg,
         device=device,
-        total_steps=250,
-        lr=0.01,
-        eval_interval=10,
+        total_steps=1500,
+        lr=0.005,
+        eval_interval=25,
     )
     reg_hist["RMSprop"] = train_regression_deterministic(
         optimizer_name="RMSprop",
@@ -355,9 +448,9 @@ def experiment2_optimizer_comparison(root: Path, device: torch.device, seed: int
         val_loader=va_reg,
         test_loader=te_reg,
         device=device,
-        total_steps=250,
-        lr=0.01,
-        eval_interval=10,
+        total_steps=1500,
+        lr=0.005,
+        eval_interval=25,
     )
 
     x_steps = np.array(reg_hist["VOGN"]["history"]["step"])
@@ -367,6 +460,7 @@ def experiment2_optimizer_comparison(root: Path, device: torch.device, seed: int
         title="Regression training loss vs iteration",
         y_label="MSE",
         path=exp_dir / "regression_loss_vs_iteration.png",
+        x_label="Iteration",
     )
     plot_metric_curves(
         x_values=x_steps,
@@ -374,15 +468,16 @@ def experiment2_optimizer_comparison(root: Path, device: torch.device, seed: int
         title="Regression test MSE vs iteration",
         y_label="Test MSE",
         path=exp_dir / "regression_test_mse_vs_iteration.png",
+        x_label="Iteration",
     )
 
     # Binary MNIST comparison
     tr_bin, va_bin, te_bin, out_dim_bin = make_mnist_loaders(
         data_dir="data",
         digits=[0, 1],
-        train_size=2000,
-        val_size=400,
-        test_size=1000,
+        train_size=2500,
+        val_size=500,
+        test_size=1200,
         batch_size=64,
         seed=seed + 22,
     )
@@ -394,8 +489,8 @@ def experiment2_optimizer_comparison(root: Path, device: torch.device, seed: int
         val_loader=va_bin,
         test_loader=te_bin,
         device=device,
-        epochs=6,
-        lr=0.02,
+        epochs=12,
+        lr=0.01,
         prior_prec=1.0,
         initial_prec=20.0,
         beta2=0.99,
@@ -407,8 +502,8 @@ def experiment2_optimizer_comparison(root: Path, device: torch.device, seed: int
         val_loader=va_bin,
         test_loader=te_bin,
         device=device,
-        epochs=6,
-        lr=0.02,
+        epochs=12,
+        lr=0.01,
         prior_prec=1.0,
         initial_prec=20.0,
         beta2=0.99,
@@ -421,8 +516,8 @@ def experiment2_optimizer_comparison(root: Path, device: torch.device, seed: int
         val_loader=va_bin,
         test_loader=te_bin,
         device=device,
-        epochs=6,
-        lr=1e-3,
+        epochs=12,
+        lr=3e-4,
     )
     clf_hist["RMSprop"] = train_classification_deterministic(
         optimizer_name="RMSprop",
@@ -431,24 +526,28 @@ def experiment2_optimizer_comparison(root: Path, device: torch.device, seed: int
         val_loader=va_bin,
         test_loader=te_bin,
         device=device,
-        epochs=6,
-        lr=1e-3,
+        epochs=12,
+        lr=3e-4,
     )
 
     x_epochs = np.array(clf_hist["VOGN"]["history"]["epoch"])
+    steps_per_epoch = len(tr_bin)
+    x_iterations = x_epochs * steps_per_epoch
     plot_metric_curves(
-        x_values=x_epochs,
+        x_values=x_iterations,
         series={k: np.array(v["history"]["train_loss"]) for k, v in clf_hist.items()},
-        title="Binary MNIST training loss vs epoch",
+        title="Binary MNIST training loss vs iteration",
         y_label="Cross-entropy",
         path=exp_dir / "classification_loss_vs_iteration.png",
+        x_label="Iteration",
     )
     plot_metric_curves(
-        x_values=x_epochs,
+        x_values=x_iterations,
         series={k: np.array(v["history"]["test_acc"]) for k, v in clf_hist.items()},
-        title="Binary MNIST test accuracy vs epoch",
+        title="Binary MNIST test accuracy vs iteration",
         y_label="Test accuracy",
         path=exp_dir / "classification_accuracy_vs_iteration.png",
+        x_label="Iteration",
     )
 
     reg_arrays = {"steps": x_steps}
@@ -458,7 +557,7 @@ def experiment2_optimizer_comparison(root: Path, device: torch.device, seed: int
         reg_arrays[f"{opt_name.lower()}_test_mse"] = np.array(run["history"]["test_mse"])
     np.savez(exp_dir / "regression_histories.npz", **reg_arrays)
 
-    clf_arrays = {"epochs": x_epochs}
+    clf_arrays = {"epochs": x_epochs, "iterations": x_iterations}
     for opt_name, run in clf_hist.items():
         clf_arrays[f"{opt_name.lower()}_train_loss"] = np.array(run["history"]["train_loss"])
         clf_arrays[f"{opt_name.lower()}_val_loss"] = np.array(run["history"]["val_loss"])
@@ -492,30 +591,61 @@ def experiment3_gp_vs_mc(root: Path, device: torch.device, exp1_artifacts: dict)
     exp_dir.mkdir(parents=True, exist_ok=True)
 
     data = exp1_artifacts["data"]
+    x_train = data["x_train"].to(device)
+    y_train = data["y_train"].to(device)
     x_test = data["x_test"].to(device)
+    y_test = data["y_test"].to(device)
     x_test_np = data["x_test"].cpu().numpy().squeeze()
     x_train_np = data["x_train"].cpu().numpy().squeeze()
     y_train_np = data["y_train"].cpu().numpy().squeeze()
+    y_test_np = data["y_test"].cpu().numpy().squeeze()
     checkpoint_steps = exp1_artifacts["checkpoint_steps"]
+    gp_noise_var = float(exp1_artifacts.get("gp_noise_var", 0.02))
 
     metrics = {"VOGN": {}, "OGGN": {}}
     for name, res in [("VOGN", exp1_artifacts["vogn"]), ("OGGN", exp1_artifacts["oggn"])]:
         for step in checkpoint_steps:
             snap = res["checkpoints"][step]
             model_step, q_state = load_snapshot_into_model(snap, input_dim=1, output_dim=1, device=device)
-            gp_out = gp_regression_from_qstate(model_step, x_test, q_state)
-            mc_out = mc_predict(model_step, q_state, x_test, mc_samples=80, classification=False, seed=step + 17)
+            gp_terms = conditioned_gp_regression_from_qstate(
+                model=model_step,
+                q_state=q_state,
+                x_train=x_train,
+                y_train=y_train,
+                x_test=x_test,
+                noise_var=gp_noise_var,
+            )
+            mc_out = conditioned_mc_regression_predict(
+                model=model_step,
+                q_state=q_state,
+                x_train=x_train,
+                y_train=y_train,
+                x_test=x_test,
+                K_st=gp_terms["K_st"],
+                A=gp_terms["A"],
+                mc_samples=60,
+                seed=step + 17,
+            )
 
-            gp_mean, gp_var = gp_out["mean"], gp_out["var"]
+            gp_mean = gp_terms["mean"].detach().cpu().numpy()
+            gp_var = gp_terms["var"].detach().cpu().numpy()
             mc_mean, mc_var = mc_out["mean"], mc_out["var"]
             mean_mse = float(np.mean((gp_mean - mc_mean) ** 2))
             var_mse = float(np.mean((gp_var - mc_var) ** 2))
-            metrics[name][f"step_{step}"] = {"mean_mse": mean_mse, "var_mse": var_mse}
+            gp_test_mse = float(torch.mean((gp_terms["mean"] - y_test) ** 2).item())
+            mc_test_mse = float(np.mean((mc_mean - y_test_np) ** 2))
+            metrics[name][f"step_{step}"] = {
+                "mean_mse": mean_mse,
+                "var_mse": var_mse,
+                "gp_test_mse": gp_test_mse,
+                "mc_test_mse": mc_test_mse,
+            }
 
             out_prefix = exp_dir / f"{name.lower()}_step_{step:03d}"
             np.savez(
                 out_prefix.with_suffix(".npz"),
                 x_test=x_test_np,
+                y_test=y_test_np,
                 gp_mean=gp_mean,
                 gp_var=gp_var,
                 mc_mean=mc_mean,
@@ -529,7 +659,7 @@ def experiment3_gp_vs_mc(root: Path, device: torch.device, exp1_artifacts: dict)
                 gp_var=gp_var,
                 mc_mean=mc_mean,
                 mc_var=mc_var,
-                title=f"{name}: GP vs MC at step {step}",
+                title=f"{name}: conditioned GP vs conditioned MC at step {step}",
                 path=exp_dir / f"{name.lower()}_gp_vs_mc_step_{step:03d}.png",
             )
 
@@ -541,9 +671,9 @@ def experiment4_kernel_evolution(root: Path, device: torch.device, exp1_artifact
     exp_dir = root / "experiment4_kernel_evolution"
     exp_dir.mkdir(parents=True, exist_ok=True)
 
-    checkpoint_steps = [0, 10, 50, 100, 200]
+    checkpoint_steps = exp1_artifacts["checkpoint_steps"]
     x_kernel = torch.linspace(-4.0, 4.0, 80, device=device, dtype=torch.double)[:, None]
-    metrics = {}
+    kernel_cache: dict[int, dict[str, np.ndarray]] = {}
 
     for step in checkpoint_steps:
         snap_v = exp1_artifacts["vogn"]["checkpoints"][step]
@@ -561,19 +691,58 @@ def experiment4_kernel_evolution(root: Path, device: torch.device, exp1_artifact
         K_ntk = compute_ntk_kernel(J_v).detach().cpu().numpy()
         K_vogn = compute_vogn_kernel(J_v, cov_v).detach().cpu().numpy()
         K_oggn = compute_oggn_kernel(J_o, cov_o).detach().cpu().numpy()
+        kernel_cache[step] = {"ntk": K_ntk, "vogn": K_vogn, "oggn": K_oggn}
+
+    ntk_vmin = float(min(np.min(kernel_cache[step]["ntk"]) for step in checkpoint_steps))
+    ntk_vmax = float(max(np.max(kernel_cache[step]["ntk"]) for step in checkpoint_steps))
+    vogn_vmin = float(min(np.min(kernel_cache[step]["vogn"]) for step in checkpoint_steps))
+    vogn_vmax = float(max(np.max(kernel_cache[step]["vogn"]) for step in checkpoint_steps))
+    oggn_vmin = float(min(np.min(kernel_cache[step]["oggn"]) for step in checkpoint_steps))
+    oggn_vmax = float(max(np.max(kernel_cache[step]["oggn"]) for step in checkpoint_steps))
+    base_step = checkpoint_steps[0]
+    K_ntk_0 = kernel_cache[base_step]["ntk"]
+    K_vogn_0 = kernel_cache[base_step]["vogn"]
+    K_oggn_0 = kernel_cache[base_step]["oggn"]
+
+    metrics = {}
+    for step in checkpoint_steps:
+        K_ntk = kernel_cache[step]["ntk"]
+        K_vogn = kernel_cache[step]["vogn"]
+        K_oggn = kernel_cache[step]["oggn"]
 
         np.save(exp_dir / f"kernel_ntk_step_{step:03d}.npy", K_ntk)
         np.save(exp_dir / f"kernel_vogn_step_{step:03d}.npy", K_vogn)
         np.save(exp_dir / f"kernel_oggn_step_{step:03d}.npy", K_oggn)
 
-        plot_kernel_heatmap(K_ntk, f"NTK-like kernel (step {step})", exp_dir / f"kernel_ntk_step_{step:03d}.png")
-        plot_kernel_heatmap(K_vogn, f"VOGN kernel (step {step})", exp_dir / f"kernel_vogn_step_{step:03d}.png")
-        plot_kernel_heatmap(K_oggn, f"OGGN kernel (step {step})", exp_dir / f"kernel_oggn_step_{step:03d}.png")
+        plot_kernel_heatmap(
+            K_ntk,
+            f"NTK-like kernel (step {step})",
+            exp_dir / f"kernel_ntk_step_{step:03d}.png",
+            vmin=ntk_vmin,
+            vmax=ntk_vmax,
+        )
+        plot_kernel_heatmap(
+            K_vogn,
+            f"VOGN kernel (step {step})",
+            exp_dir / f"kernel_vogn_step_{step:03d}.png",
+            vmin=vogn_vmin,
+            vmax=vogn_vmax,
+        )
+        plot_kernel_heatmap(
+            K_oggn,
+            f"OGGN kernel (step {step})",
+            exp_dir / f"kernel_oggn_step_{step:03d}.png",
+            vmin=oggn_vmin,
+            vmax=oggn_vmax,
+        )
 
         metrics[f"step_{step}"] = {
             "trace_ntk": float(np.trace(K_ntk)),
             "trace_vogn": float(np.trace(K_vogn)),
             "trace_oggn": float(np.trace(K_oggn)),
+            "fro_delta_ntk": float(np.linalg.norm(K_ntk - K_ntk_0)),
+            "fro_delta_vogn": float(np.linalg.norm(K_vogn - K_vogn_0)),
+            "fro_delta_oggn": float(np.linalg.norm(K_oggn - K_oggn_0)),
         }
 
     save_json(exp_dir / "metrics.json", metrics)
@@ -660,7 +829,7 @@ def experiment6_calibration(root: Path, device: torch.device, seed: int) -> dict
         train_size=3000,
         val_size=500,
         test_size=1000,
-        batch_size=64,
+        batch_size=128,
         seed=seed + 444,
     )
     x_test, y_test = loader_to_tensors(test_loader, device=device, dtype=torch.double)
@@ -672,8 +841,8 @@ def experiment6_calibration(root: Path, device: torch.device, seed: int) -> dict
         val_loader=val_loader,
         test_loader=test_loader,
         device=device,
-        epochs=6,
-        lr=0.02,
+        epochs=12,
+        lr=0.01,
         prior_prec=1.0,
         initial_prec=20.0,
         beta2=0.99,
@@ -685,8 +854,8 @@ def experiment6_calibration(root: Path, device: torch.device, seed: int) -> dict
         val_loader=val_loader,
         test_loader=test_loader,
         device=device,
-        epochs=6,
-        lr=0.02,
+        epochs=12,
+        lr=0.01,
         prior_prec=1.0,
         initial_prec=20.0,
         beta2=0.99,
@@ -699,8 +868,8 @@ def experiment6_calibration(root: Path, device: torch.device, seed: int) -> dict
         val_loader=val_loader,
         test_loader=test_loader,
         device=device,
-        epochs=6,
-        lr=1e-3,
+        epochs=12,
+        lr=3e-4,
     )
 
     all_runs = {"VOGN": vogn_res, "OGGN": oggn_res, "Adam": adam_res}
@@ -748,6 +917,7 @@ def experiment6_calibration(root: Path, device: torch.device, seed: int) -> dict
         title="NLL during training",
         y_label="NLL",
         path=exp_dir / "nll_vs_epoch.png",
+        x_label="Epoch",
     )
     plot_metric_curves(
         x_values=x_epochs,
@@ -755,6 +925,7 @@ def experiment6_calibration(root: Path, device: torch.device, seed: int) -> dict
         title="ECE during training",
         y_label="ECE",
         path=exp_dir / "ece_vs_epoch.png",
+        x_label="Epoch",
     )
     plot_metric_curves(
         x_values=x_epochs,
@@ -762,6 +933,7 @@ def experiment6_calibration(root: Path, device: torch.device, seed: int) -> dict
         title="Brier score during training",
         y_label="Brier",
         path=exp_dir / "brier_vs_epoch.png",
+        x_label="Epoch",
     )
 
     for name, probs in final_probs.items():

@@ -386,6 +386,18 @@ source ~/envs/base/bin/activate
 python run_all_vogn_experiments.py --device cuda
 ```
 
+Revision note (March 8, 2026):
+- The first version of this suite used an unconditioned GP mean in Exp. 1/3 (`f_mu(x)` only), which made fits look poor.
+- The current version uses posterior-conditioned GP predictions in regression experiments:
+  - `m(x*) + K_*t (K_tt + sigma^2 I)^-1 (y_t - m(x_t))`
+- Training schedules were also extended beyond the original short setup:
+  - Exp. 1: steps up to `2500` with checkpoints `[0, 100, 250, 500, 1000, 1750, 2500]`
+  - Exp. 2 and 6: MNIST now runs for `12` epochs (instead of `6`)
+- Current key outcomes from `voggn_results/summary_metrics.json`:
+  - Exp. 1 posterior test MSE at step `2500`: `VOGN=0.0244`, `OGGN=0.0852`
+  - Exp. 3 GP-vs-MC mismatch at step `2500`: `mean_mse=0.0023` (VOGN), `0.0049` (OGGN)
+  - Exp. 5 OOD entropy AUROC: `VOGN=0.9475`, `OGGN=0.9506`
+
 Code organization:
 - `run_all_vogn_experiments.py` orchestrates all experiments.
 - `experiments_vogn/` contains modular training, GP prediction, MC prediction, kernel, uncertainty, and plotting utilities.

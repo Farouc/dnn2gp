@@ -74,9 +74,16 @@ def plot_gp_vs_mc(
     _save_fig(fig, path)
 
 
-def plot_kernel_heatmap(kernel: np.ndarray, title: str, path: Path, cmap: str = "magma") -> None:
+def plot_kernel_heatmap(
+    kernel: np.ndarray,
+    title: str,
+    path: Path,
+    cmap: str = "magma",
+    vmin: float | None = None,
+    vmax: float | None = None,
+) -> None:
     fig, ax = plt.subplots(figsize=(5.2, 4.8))
-    im = ax.imshow(kernel, cmap=cmap, aspect="auto")
+    im = ax.imshow(kernel, cmap=cmap, aspect="auto", vmin=vmin, vmax=vmax)
     ax.set_title(title)
     ax.set_xlabel("index")
     ax.set_ylabel("index")
@@ -91,13 +98,15 @@ def plot_metric_curves(
     title: str,
     y_label: str,
     path: Path,
+    x_label: str = "Iteration / Epoch",
 ) -> None:
     fig, ax = plt.subplots(figsize=(8.4, 4.8))
     palette = ["#1f77b4", "#d62728", "#2ca02c", "#9467bd", "#ff7f0e"]
+    marker = None if len(x_values) > 25 else "o"
     for idx, (name, y) in enumerate(series.items()):
-        ax.plot(x_values, y, marker="o", linewidth=2.0, color=palette[idx % len(palette)], label=name)
+        ax.plot(x_values, y, marker=marker, linewidth=2.0, color=palette[idx % len(palette)], label=name)
     ax.set_title(title)
-    ax.set_xlabel("Iteration / Epoch")
+    ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
     ax.grid(alpha=0.25)
     ax.legend(loc="best")
@@ -158,4 +167,3 @@ def plot_calibration_curve(
     ax.legend(loc="best")
     fig.tight_layout()
     _save_fig(fig, path)
-

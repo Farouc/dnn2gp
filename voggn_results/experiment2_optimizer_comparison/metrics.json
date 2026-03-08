@@ -1,0 +1,46 @@
+{
+  "regression": {
+    "VOGN": {
+      "final_train_loss": 0.34145174769683095,
+      "final_val_loss": 0.29380756603971125,
+      "final_test_mse": 0.2687553787979578
+    },
+    "OGGN": {
+      "final_train_loss": 0.3995192689481668,
+      "final_val_loss": 0.34368741697557786,
+      "final_test_mse": 0.2835007110715123
+    },
+    "Adam": {
+      "final_train_loss": 0.012464506040302912,
+      "final_val_loss": 0.020970888075525433,
+      "final_test_mse": 0.004410459978113486
+    },
+    "RMSprop": {
+      "final_train_loss": 0.054988193966342934,
+      "final_val_loss": 0.06441045095722174,
+      "final_test_mse": 0.03462014831777308
+    }
+  },
+  "classification": {
+    "VOGN": {
+      "final_train_loss": 0.0002445878491927184,
+      "final_val_loss": 0.028960720952000606,
+      "final_test_acc": 0.999
+    },
+    "OGGN": {
+      "final_train_loss": 0.0004775269394531222,
+      "final_val_loss": 0.00012332585018730514,
+      "final_test_acc": 1.0
+    },
+    "Adam": {
+      "final_train_loss": 0.0016801415244539837,
+      "final_val_loss": 0.0018042662430412019,
+      "final_test_acc": 1.0
+    },
+    "RMSprop": {
+      "final_train_loss": 0.0005007817179954536,
+      "final_val_loss": 0.0017980728061075181,
+      "final_test_acc": 1.0
+    }
+  }
+}

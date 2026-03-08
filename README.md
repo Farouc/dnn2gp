@@ -376,3 +376,223 @@ CSV columns explained:
 - Use epistemic for model uncertainty about unseen/shifted inputs.
 - Very high epistemic spikes under attacks or strong transforms usually indicate distribution shift sensitivity.
 - Compare clean vs perturbed relatively (change/trend), not by expecting a fixed absolute scale like `[0,1]` for epistemic.
+
+## VOGN / OGGN Training-to-GP Experiments (Detailed)
+
+This section documents the full experiment suite generated in `voggn_results/` by:
+
+```bash
+source ~/envs/base/bin/activate
+python run_all_vogn_experiments.py --device cuda
+```
+
+Code organization:
+- `run_all_vogn_experiments.py` orchestrates all experiments.
+- `experiments_vogn/` contains modular training, GP prediction, MC prediction, kernel, uncertainty, and plotting utilities.
+- In this codebase, "OGGN" experiments are run with the `VOGGN` optimizer class from `src/vogn.py`.
+
+All experiments save:
+- plots (`.png`)
+- arrays (`.npz` / `.npy`)
+- metrics (`metrics.json`)
+
+Global summary:
+- `voggn_results/summary_metrics.json`
+
+### Experiment 1: Evolution of GP Predictive Distribution During Training
+
+Folder:
+- `voggn_results/experiment1_gp_evolution/`
+
+Setup:
+- 1D regression toy dataset with a central gap: `x in [-4,4]`, removed interval `[-1,1]`.
+- Target: `y = sin(x) + noise`.
+- Small MLP (`hidden=32`, two hidden layers, `tanh`).
+- Checkpoints: `step = [0, 10, 50, 100, 200, 500]`.
+- For each checkpoint and optimizer (VOGN, OGGN), compute linearized GP mean/variance and plot:
+  - train points
+  - predictive mean curve
+  - `±2 sigma` band
+
+Saved files:
+- `vogn/mean_variance_step_XXX.png`, `oggn/mean_variance_step_XXX.png`
+- `vogn/gp_step_XXX.npz`, `oggn/gp_step_XXX.npz`
+
+Observed results (from `summary_metrics.json`):
+- Mean predictive variance (`mean_var`) generally decreases during training for both methods.
+- VOGN: `0.558 (step 0) -> 0.233 (step 200)`, then rises at `step 500` (`0.435`).
+- OGGN: `0.512 (step 0) -> 0.190 (step 200)`, remains lower at `step 500` (`0.206`).
+
+Interpretation:
+- Both methods reduce posterior uncertainty as they fit data.
+- OGGN shows a more stable low-variance endpoint in this run.
+- VOGN shows late-stage variance increase, indicating a less stable final posterior geometry for this seed/hyperparameter choice.
+
+### Experiment 2: Optimization Behavior Comparison
+
+Folder:
+- `voggn_results/experiment2_optimizer_comparison/`
+
+Compared optimizers:
+- `VOGN`, `OGGN`, `Adam`, `RMSprop`.
+
+Tasks:
+- Toy regression (same gap-sine setup).
+- Binary MNIST classification (`0 vs 1`).
+
+Saved files:
+- Regression curves: `regression_loss_vs_iteration.png`, `regression_test_mse_vs_iteration.png`
+- Classification curves: `classification_loss_vs_iteration.png`, `classification_accuracy_vs_iteration.png`
+- Arrays: `regression_histories.npz`, `classification_histories.npz`
+- Metrics: `metrics.json`
+
+Observed results:
+- Regression final test MSE:
+  - `VOGN: 0.2718`
+  - `OGGN: 0.2806`
+  - `Adam: 0.0030`
+  - `RMSprop: 0.0159`
+- Binary MNIST final test accuracy:
+  - `VOGN: 0.999`
+  - `OGGN: 1.000`
+  - `Adam: 1.000`
+  - `RMSprop: 1.000`
+
+Interpretation:
+- On small binary MNIST, all methods solve the task almost perfectly.
+- On this toy regression setting, deterministic optimizers reached lower test MSE than variational optimizers under current hyperparameters.
+- This does not invalidate VOGN/OGGN; it reflects that variational training is optimizing a different objective and is sensitive to prior/precision settings.
+
+### Experiment 3: GP Predictive Distribution vs Monte Carlo Weight Sampling
+
+Folder:
+- `voggn_results/experiment3_gp_vs_mc/`
+
+Goal:
+- Test how closely linearized GP predictions match nonlinear Monte Carlo predictions from sampled weights `w ~ N(mu_t, Sigma_t)`.
+
+Method:
+- Reuse checkpoints from Experiment 1.
+- For each checkpoint and optimizer:
+  - GP predictive mean/variance from Jacobians.
+  - MC mean/variance from ~80 sampled networks.
+  - Compute mismatch metrics: `mean_mse`, `var_mse`.
+
+Saved files:
+- Comparison figures: `*_gp_vs_mc_step_XXX.png`
+- Arrays: `*_step_XXX.npz`
+- Metrics: `metrics.json`
+
+Observed results:
+- OGGN has consistently low mismatch at late checkpoints:
+  - `var_mse` reaches `0.0054` (step 500).
+- VOGN variance mismatch is also low at step 500 (`0.0092`), but mean mismatch increases (`mean_mse = 0.3612`).
+
+Interpretation:
+- Variance agreement is reasonably good for both methods at late stages.
+- Mean agreement is more stable for OGGN in this run.
+- The figures are useful diagnostics of linearization quality across training.
+
+### Experiment 4: Kernel Evolution During Training
+
+Folder:
+- `voggn_results/experiment4_kernel_evolution/`
+
+Kernels plotted at steps `[0, 10, 50, 100, 200]`:
+- NTK-like: `J J^T`
+- VOGN kernel: `J Sigma_t J^T`
+- OGGN kernel: `J Sigma_hat_t J^T`
+
+Saved files:
+- Heatmaps: `kernel_ntk_step_XXX.png`, `kernel_vogn_step_XXX.png`, `kernel_oggn_step_XXX.png`
+- Matrices: corresponding `.npy` files
+- Metrics: `metrics.json` (including trace values)
+
+Observed results:
+- NTK trace remains much larger than posterior-weighted kernels (expected due to no posterior covariance scaling).
+- Trace trends from step 0 to 200:
+  - VOGN kernel trace: `44.76 -> 18.75`
+  - OGGN kernel trace: `41.09 -> 15.27`
+
+Interpretation:
+- Posterior-aware kernels contract during training, indicating reduced uncertainty-weighted function-space variability.
+- OGGN contracts slightly more by step 200 in this run.
+
+### Experiment 5: OOD Detection with Uncertainty
+
+Folder:
+- `voggn_results/experiment5_ood_detection/`
+
+Protocol:
+- Train uncertainty model on MNIST digits `{0,1}`.
+- Evaluate on a subset of full MNIST test `{0..9}`.
+- Define OOD as digits not in `{0,1}`.
+- Compute per-sample:
+  - predictive entropy
+  - predictive variance proxy
+- Measure AUROC for OOD detection.
+
+Saved files:
+- Histograms: `vogn_ood_entropy.png`, `vogn_ood_variance.png`, `oggn_ood_entropy.png`, `oggn_ood_variance.png`
+- Arrays: `vogn_ood_arrays.npz`, `oggn_ood_arrays.npz`
+- Metrics: `metrics.json`
+
+Observed results:
+- Entropy AUROC:
+  - `VOGN: 0.9261`
+  - `OGGN: 0.9542`
+- Predictive variance AUROC:
+  - `VOGN: 0.9212`
+  - `OGGN: 0.9489`
+- Seen vs unseen separation (entropy means):
+  - VOGN: `0.0102 (seen)` vs `0.2484 (unseen)`
+  - OGGN: `0.0140 (seen)` vs `0.3044 (unseen)`
+
+Interpretation:
+- Both models provide useful uncertainty for OOD separation.
+- OGGN gave stronger AUROC on this run.
+- Histogram overlap is lower for OGGN, consistent with better separation.
+
+### Experiment 6: Calibration During Training
+
+Folder:
+- `voggn_results/experiment6_calibration/`
+
+Compared methods:
+- `VOGN`, `OGGN`, `Adam` on full MNIST (`0..9`, subset sizes for tractability).
+
+Metrics tracked by epoch:
+- Negative log-likelihood (NLL)
+- Expected calibration error (ECE)
+- Brier score
+
+Saved files:
+- Metric curves: `nll_vs_epoch.png`, `ece_vs_epoch.png`, `brier_vs_epoch.png`
+- Reliability diagrams: `calibration_curve_vogn.png`, `calibration_curve_oggn.png`, `calibration_curve_adam.png`
+- Arrays: `calibration_arrays.npz`
+- Metrics: `metrics.json`
+
+Final-epoch results:
+- NLL:
+  - `VOGN: 1.0083`
+  - `OGGN: 1.0167`
+  - `Adam: 0.3790`
+- ECE:
+  - `VOGN: 0.0781`
+  - `OGGN: 0.0750`
+  - `Adam: 0.0475`
+- Brier:
+  - `VOGN: 0.4670`
+  - `OGGN: 0.4902`
+  - `Adam: 0.1622`
+
+Interpretation:
+- All methods improve substantially during training.
+- In this run, Adam ends with stronger calibration/probability scores.
+- VOGN and OGGN remain competitive in ECE while carrying posterior uncertainty structure useful for GP-style analyses and OOD behavior.
+
+### Reproducibility Notes
+
+- The suite uses small datasets/subsets to keep Jacobian and kernel computations tractable.
+- Results are seed- and hyperparameter-dependent; compare methods over multiple seeds before drawing final conclusions.
+- Use `voggn_results/summary_metrics.json` for quick numeric comparison and the corresponding PNGs for qualitative diagnosis.

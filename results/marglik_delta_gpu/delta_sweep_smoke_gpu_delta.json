@@ -1,0 +1,103 @@
+{
+  "experiment": "marglik_delta_gpu",
+  "name": "smoke_gpu_delta",
+  "device": "cpu",
+  "dtype": "float32",
+  "config": {
+    "n_retries": 1,
+    "n_train": 40,
+    "n_test": 200,
+    "n_params": 3,
+    "delta_log10_min": -2.0,
+    "delta_log10_max": 2.0,
+    "n_epochs": 20,
+    "hidden_size": 20,
+    "n_layers": 2,
+    "activation": "tanh",
+    "sigma_noise": 1.0,
+    "sigma_low": 0.1,
+    "sigma_high": 1.0,
+    "p_middle": 0.1,
+    "learning_rate": 0.02,
+    "lr_factor": 0.995,
+    "seed": 7
+  },
+  "runtime_seconds": 3.1934599209344015,
+  "best_delta_by_test_mse": 0.01,
+  "best_delta_by_neg_train_marglik": 1.0,
+  "raw_results": [
+    {
+      "delta": 0.01,
+      "retries": [
+        {
+          "dataset_seed": 7,
+          "train_mse_map": 0.2614410836581978,
+          "test_mse_map": 0.16954077726965447,
+          "train_log_marglik": -59.71072576484933,
+          "final_train_loss": 5.500693321228027
+        }
+      ]
+    },
+    {
+      "delta": 1.0,
+      "retries": [
+        {
+          "dataset_seed": 1007,
+          "train_mse_map": 0.22475548747778018,
+          "test_mse_map": 0.46515363476288285,
+          "train_log_marglik": -46.89325918689703,
+          "final_train_loss": 7.00837516784668
+        }
+      ]
+    },
+    {
+      "delta": 100.0,
+      "retries": [
+        {
+          "dataset_seed": 2007,
+          "train_mse_map": 0.4144534291964582,
+          "test_mse_map": 0.4119288868135509,
+          "train_log_marglik": -49.250234017385566,
+          "final_train_loss": 75.14637756347656
+        }
+      ]
+    }
+  ],
+  "aggregated": {
+    "delta": [
+      0.01,
+      1.0,
+      100.0
+    ],
+    "train_mse_mean": [
+      0.2614410836581978,
+      0.22475548747778018,
+      0.4144534291964582
+    ],
+    "train_mse_sem": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "test_mse_mean": [
+      0.16954077726965447,
+      0.46515363476288285,
+      0.4119288868135509
+    ],
+    "test_mse_sem": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "neg_train_marglik_mean": [
+      59.71072576484933,
+      46.89325918689703,
+      49.250234017385566
+    ],
+    "neg_train_marglik_sem": [
+      0.0,
+      0.0,
+      0.0
+    ]
+  }
+}

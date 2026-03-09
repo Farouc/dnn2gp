@@ -1,0 +1,90 @@
+{
+  "experiment": "curvature_hardband_2d",
+  "device": "cpu",
+  "seed": 123,
+  "n_train": 3200,
+  "n_test": 2800,
+  "laplace_train_size": 1400,
+  "train_hard_fraction_target": 0.2,
+  "train_hard_fraction_realized": 0.22,
+  "map_train_accuracy": 0.953125,
+  "map_test_accuracy": 0.9464285714285714,
+  "metrics_test": {
+    "map": {
+      "accuracy": 0.9464285714285714,
+      "nll": 0.10998655568326536,
+      "brier": 0.03571136241501632,
+      "ece": 0.01586630442978318
+    },
+    "ntk": {
+      "accuracy": 0.9435714285714286,
+      "nll": 0.20231156349222706,
+      "brier": 0.05168810290986396,
+      "ece": 0.09748712887048883
+    },
+    "curvature": {
+      "accuracy": 0.9482142857142857,
+      "nll": 0.10838873005829357,
+      "brier": 0.03486697574667817,
+      "ece": 0.012549055236481171
+    }
+  },
+  "high_noise_region_test": {
+    "map": {
+      "entropy_mean": 0.3534670208801922,
+      "nll": 0.46038027582859264,
+      "brier": 0.15559864202412588,
+      "count": 616
+    },
+    "ntk": {
+      "entropy_mean": 0.5837436386575011,
+      "nll": 0.4900125929003409,
+      "brier": 0.1608155387614267,
+      "count": 616
+    },
+    "curvature": {
+      "entropy_mean": 0.42235522931031005,
+      "nll": 0.43076523799938976,
+      "brier": 0.14625109980842607,
+      "count": 616
+    }
+  },
+  "low_noise_region_test": {
+    "map": {
+      "entropy_mean": 0.008341501700751486,
+      "nll": 0.0026136319597766743,
+      "brier": 0.0003422499566711727,
+      "count": 616
+    },
+    "ntk": {
+      "entropy_mean": 0.20340712838507505,
+      "nll": 0.06637846189864141,
+      "brier": 0.007909061159165278,
+      "count": 616
+    },
+    "curvature": {
+      "entropy_mean": 0.011389760916873302,
+      "nll": 0.004654188137636976,
+      "brier": 0.0009035685336946561,
+      "count": 616
+    }
+  },
+  "noise_thresholds": {
+    "hard_quantile": 0.78,
+    "sigma_high_threshold_test": 0.16887721389048677,
+    "sigma_low_threshold_test": 0.08007785482927167,
+    "hard_region_fraction_test": 0.22,
+    "low_region_fraction_test": 0.22
+  },
+  "kernel_corr_upper_tri_normalized": 0.9967427618233262,
+  "lambda_trace_grid_mean": 0.06128802692001296,
+  "lambda_trace_grid_std": 0.1297181389092245,
+  "figures": {
+    "dataset": "/mnt/D/mva_P2/Bayesian_ML/project/results/curvature_hardband_2d/dataset_and_noise_maps_neurips.png",
+    "probability_maps": "/mnt/D/mva_P2/Bayesian_ML/project/results/curvature_hardband_2d/predictive_probability_maps_neurips.png",
+    "entropy_maps": "/mnt/D/mva_P2/Bayesian_ML/project/results/curvature_hardband_2d/predictive_entropy_maps_neurips.png",
+    "kernel_maps": "/mnt/D/mva_P2/Bayesian_ML/project/results/curvature_hardband_2d/kernel_comparison_neurips.png",
+    "risk_coverage": "/mnt/D/mva_P2/Bayesian_ML/project/results/curvature_hardband_2d/hard_region_risk_coverage_neurips.png"
+  },
+  "quick_take": "curvature better calibrated globally and in hard region"
+}

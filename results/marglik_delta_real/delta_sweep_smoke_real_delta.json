@@ -1,0 +1,118 @@
+{
+  "experiment": "marglik_delta_real",
+  "name": "smoke_real_delta",
+  "dataset": "diabetes",
+  "dataset_name": "Diabetes (real regression)",
+  "device": "cpu",
+  "dtype": "float32",
+  "runtime_seconds": 19.729627688997425,
+  "config": {
+    "test_size": 0.25,
+    "n_retries": 1,
+    "n_params": 2,
+    "delta_log10_min": -2.0,
+    "delta_log10_max": 2.0,
+    "n_epochs": 10,
+    "vi_epochs": 10,
+    "include_vi": true,
+    "hidden_size": 20,
+    "n_layers": 2,
+    "activation": "tanh",
+    "sigma_noise": 1.0,
+    "learning_rate": 0.02,
+    "lr_factor": 0.995,
+    "seed": 7
+  },
+  "best_delta_by_test_mse": 100.0,
+  "best_delta_by_neg_train_marglik": 100.0,
+  "raw_results": [
+    {
+      "delta": 0.01,
+      "retries": [
+        {
+          "split_seed": 7,
+          "train_mse_map": 2908.4000721546104,
+          "test_mse_map": 3206.9747860238126,
+          "train_log_marglik": -585.576281184243,
+          "final_train_loss": 82.7426986694336,
+          "train_mse_vi": 3748.216161716336,
+          "test_mse_vi": 3429.112411061523,
+          "train_log_marglik_vi": -575.448189617671,
+          "final_train_loss_vi": 413.85777170261144
+        }
+      ]
+    },
+    {
+      "delta": 100.0,
+      "retries": [
+        {
+          "split_seed": 7,
+          "train_mse_map": 3313.7612157499166,
+          "test_mse_map": 3142.4812839125643,
+          "train_log_marglik": -431.6797322602159,
+          "final_train_loss": 162.39468383789062,
+          "train_mse_vi": 4131.98207568839,
+          "test_mse_vi": 3861.2014493413762,
+          "train_log_marglik_vi": -422.2413684216299,
+          "final_train_loss_vi": 423.383748037416
+        }
+      ]
+    }
+  ],
+  "aggregated": {
+    "delta": [
+      0.01,
+      100.0
+    ],
+    "train_mse_mean": [
+      2908.4000721546104,
+      3313.7612157499166
+    ],
+    "train_mse_sem": [
+      0.0,
+      0.0
+    ],
+    "test_mse_mean": [
+      3206.9747860238126,
+      3142.4812839125643
+    ],
+    "test_mse_sem": [
+      0.0,
+      0.0
+    ],
+    "neg_train_marglik_mean": [
+      585.576281184243,
+      431.6797322602159
+    ],
+    "neg_train_marglik_sem": [
+      0.0,
+      0.0
+    ],
+    "train_mse_vi_mean": [
+      3748.216161716336,
+      4131.98207568839
+    ],
+    "train_mse_vi_sem": [
+      0.0,
+      0.0
+    ],
+    "test_mse_vi_mean": [
+      3429.112411061523,
+      3861.2014493413762
+    ],
+    "test_mse_vi_sem": [
+      0.0,
+      0.0
+    ],
+    "neg_train_marglik_vi_mean": [
+      575.448189617671,
+      422.2413684216299
+    ],
+    "neg_train_marglik_vi_sem": [
+      0.0,
+      0.0
+    ]
+  },
+  "best_delta_by_test_mse_vi": 0.01,
+  "best_delta_by_neg_train_marglik_vi": 100.0
+}

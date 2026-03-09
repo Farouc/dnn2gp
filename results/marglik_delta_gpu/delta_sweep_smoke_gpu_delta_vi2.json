@@ -1,0 +1,121 @@
+{
+  "experiment": "marglik_delta_gpu",
+  "name": "smoke_gpu_delta_vi2",
+  "device": "cpu",
+  "dtype": "float32",
+  "config": {
+    "n_retries": 1,
+    "n_train": 25,
+    "n_test": 60,
+    "n_params": 2,
+    "delta_log10_min": -2.0,
+    "delta_log10_max": 2.0,
+    "n_epochs": 5,
+    "vi_epochs": 5,
+    "include_vi": true,
+    "hidden_size": 20,
+    "n_layers": 2,
+    "activation": "tanh",
+    "sigma_noise": 1.0,
+    "sigma_low": 0.1,
+    "sigma_high": 1.0,
+    "p_middle": 0.1,
+    "learning_rate": 0.02,
+    "lr_factor": 0.995,
+    "seed": 7,
+    "dataset_name": "Snelson heteroscedastic sine"
+  },
+  "runtime_seconds": 2.9547588039422408,
+  "best_delta_by_test_mse": 0.01,
+  "best_delta_by_neg_train_marglik": 100.0,
+  "raw_results": [
+    {
+      "delta": 0.01,
+      "retries": [
+        {
+          "dataset_seed": 7,
+          "train_mse_map": 0.2354258381613505,
+          "test_mse_map": 0.25736850069922523,
+          "train_log_marglik": -38.69225717787158,
+          "final_train_loss": 3.1022801399230957,
+          "train_mse_vi": 0.2404833310307007,
+          "test_mse_vi": 0.2744934563700067,
+          "train_log_marglik_vi": -41.011506025362266,
+          "final_train_loss_vi": 28.009819388398782
+        }
+      ]
+    },
+    {
+      "delta": 100.0,
+      "retries": [
+        {
+          "dataset_seed": 1007,
+          "train_mse_map": 0.34073046157277004,
+          "test_mse_map": 0.3233623352197348,
+          "train_log_marglik": -28.621723479641144,
+          "final_train_loss": 434.5744323730469,
+          "train_mse_vi": 0.3880016586300831,
+          "test_mse_vi": 0.4275843361861631,
+          "train_log_marglik_vi": -28.305191376455117,
+          "final_train_loss_vi": 28.02339469058181
+        }
+      ]
+    }
+  ],
+  "aggregated": {
+    "delta": [
+      0.01,
+      100.0
+    ],
+    "train_mse_mean": [
+      0.2354258381613505,
+      0.34073046157277004
+    ],
+    "train_mse_sem": [
+      0.0,
+      0.0
+    ],
+    "test_mse_mean": [
+      0.25736850069922523,
+      0.3233623352197348
+    ],
+    "test_mse_sem": [
+      0.0,
+      0.0
+    ],
+    "neg_train_marglik_mean": [
+      38.69225717787158,
+      28.621723479641144
+    ],
+    "neg_train_marglik_sem": [
+      0.0,
+      0.0
+    ],
+    "train_mse_vi_mean": [
+      0.2404833310307007,
+      0.3880016586300831
+    ],
+    "train_mse_vi_sem": [
+      0.0,
+      0.0
+    ],
+    "test_mse_vi_mean": [
+      0.2744934563700067,
+      0.4275843361861631
+    ],
+    "test_mse_vi_sem": [
+      0.0,
+      0.0
+    ],
+    "neg_train_marglik_vi_mean": [
+      41.011506025362266,
+      28.305191376455117
+    ],
+    "neg_train_marglik_vi_sem": [
+      0.0,
+      0.0
+    ]
+  },
+  "best_delta_by_test_mse_vi": 0.01,
+  "best_delta_by_neg_train_marglik_vi": 100.0
+}

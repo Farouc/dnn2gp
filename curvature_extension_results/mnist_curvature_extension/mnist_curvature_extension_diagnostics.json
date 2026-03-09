@@ -1,0 +1,53 @@
+{
+  "kernel_corr_recomputed": 0.8715473219332163,
+  "entropy_mean_dnn2gp": 2.0450905905746417,
+  "entropy_mean_curvature": 0.026533171672206292,
+  "entropy_median_dnn2gp": 2.0620533072329925,
+  "entropy_median_curvature": 1.2229381622193965e-06,
+  "acc_map": 0.991,
+  "acc_dnn2gp": 0.871,
+  "acc_curvature": 0.992,
+  "agreement_map_vs_dnn2gp": 0.873,
+  "agreement_map_vs_curvature": 0.999,
+  "agreement_dnn2gp_vs_curvature": 0.874,
+  "lambda_trace_mean_saved": 0.0033722344557905993,
+  "lambda_trace_var_saved": 0.0008763350150045812,
+  "lambda_trace_mean_recomputed": 0.0033722344557906,
+  "lambda_trace_var_recomputed": 0.0008763350150045817,
+  "lambda_trace_std_recomputed": 0.029602956186917915,
+  "lambda_fro_mean": 0.003132004578298947,
+  "lambda_maxeig_mean": 0.003100584611418988,
+  "pred_prob_mean": 0.9979222178778141,
+  "pred_prob_median": 0.9999999311407081,
+  "p1mp_mean": 0.0016312193480956712,
+  "p1mp_median": 6.885928719350852e-08,
+  "corr_predprob_lambda_trace": -0.9858166853170156,
+  "corr_predprob_p1mp": -0.9670588305332908,
+  "confidence_bins": [
+    {
+      "bin": "[0.0,0.9)",
+      "count": 5,
+      "lambda_trace_mean": 0.3636413922278062,
+      "pred_class_p1mp_mean": 0.17112166973406404
+    },
+    {
+      "bin": "[0.9,0.99)",
+      "count": 17,
+      "lambda_trace_mean": 0.07809899546115182,
+      "pred_class_p1mp_mean": 0.0389701403781427
+    },
+    {
+      "bin": "[0.99,0.999)",
+      "count": 20,
+      "lambda_trace_mean": 0.00916547588877901,
+      "pred_class_p1mp_mean": 0.004580131453962178
+    },
+    {
+      "bin": "[0.999,1.0]",
+      "count": 958,
+      "lambda_trace_mean": 4.4921768305227076e-05,
+      "pred_class_p1mp_mean": 2.2459273400502764e-05
+    }
+  ],
+  "p1mp_plot_path": "/home/farouc/Disque_D/mva_P2/Bayesian_ML/project/curvature_extension_results/mnist_curvature_extension/mnist_predicted_class_p1mp_distribution.png"
+}

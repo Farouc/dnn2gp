@@ -195,6 +195,7 @@ def main() -> None:
     entropy_dnn2gp, entropy_curv = [], []
     lambda_trace = []
     kernel_j, kernel_j_curv = [], []
+    kernel_labels = []
 
     for x, y in tqdm(eval_loader, desc="MNIST DNN2GP/curvature eval"):
         x = x.to(device=device, dtype=torch.double)
@@ -205,8 +206,10 @@ def main() -> None:
         sqrt_lam = matrix_sqrt_psd(lam)
 
         jac_curv = sqrt_lam @ jac
-        var_orig = torch.einsum("kp,p,kp->k", jac, inv_post_prec, jac).clamp_min(1e-10)
-        var_curv = torch.einsum("kp,p,kp->k", jac_curv, inv_post_prec, jac_curv).clamp_min(1e-10)
+        cov_logits = torch.einsum("kp,p,mp->km", jac, inv_post_prec, jac)
+        # Keep "original" aligned with src/dnn2gp.py, which applies Lambda on both sides.
+        var_orig = torch.diag(lam @ cov_logits @ lam).clamp_min(1e-10)
+        var_curv = torch.diag(sqrt_lam @ cov_logits @ sqrt_lam).clamp_min(1e-10)
 
         probs_orig, ent_orig = mc_probs_from_diag_logit_var(
             mean_logits=logits,
@@ -232,6 +235,7 @@ def main() -> None:
         if len(kernel_j) < args.kernel_size:
             kernel_j.append(jac.detach().cpu().float().numpy())
             kernel_j_curv.append(jac_curv.detach().cpu().float().numpy())
+            kernel_labels.append(int(y.item()))
 
     y_true_np = np.asarray(y_true)
     pred_map_np = np.asarray(pred_map)
@@ -247,6 +251,11 @@ def main() -> None:
 
     J = np.stack(kernel_j, axis=0)
     Jc = np.stack(kernel_j_curv, axis=0)
+    kernel_labels_np = np.asarray(kernel_labels, dtype=np.int64)
+    sort_idx = np.argsort(kernel_labels_np, kind="stable")
+    J = J[sort_idx]
+    Jc = Jc[sort_idx]
+    kernel_labels_np = kernel_labels_np[sort_idx]
     K_orig = np.einsum("ikp,jkp->ij", J, J, optimize=True)
     K_curv = np.einsum("ikp,jkp->ij", Jc, Jc, optimize=True)
     K_orig_n = normalize_kernel(K_orig)
@@ -269,17 +278,18 @@ def main() -> None:
         entropy_dnn2gp=entropy_dnn2gp_np,
         entropy_curvature=entropy_curv_np,
         lambda_trace=lambda_trace_np,
+        kernel_labels=kernel_labels_np,
     )
 
     fig, axs = plt.subplots(2, 3, figsize=(15.8, 9.0))
     im0 = axs[0, 0].imshow(K_orig_n, cmap="magma", aspect="auto")
-    axs[0, 0].set_title("Original DNN2GP kernel (normalized)")
+    axs[0, 0].set_title("Original DNN2GP kernel (normalized, sorted by class)")
     axs[0, 0].set_xlabel("sample index")
     axs[0, 0].set_ylabel("sample index")
     fig.colorbar(im0, ax=axs[0, 0], fraction=0.046, pad=0.04)
 
     im1 = axs[0, 1].imshow(K_curv_n, cmap="magma", aspect="auto")
-    axs[0, 1].set_title("Curvature-weighted kernel (normalized)")
+    axs[0, 1].set_title("Curvature-weighted kernel (normalized, sorted by class)")
     axs[0, 1].set_xlabel("sample index")
     axs[0, 1].set_ylabel("sample index")
     fig.colorbar(im1, ax=axs[0, 1], fraction=0.046, pad=0.04)
@@ -290,6 +300,11 @@ def main() -> None:
     axs[0, 2].set_xlabel("sample index")
     axs[0, 2].set_ylabel("sample index")
     fig.colorbar(im2, ax=axs[0, 2], fraction=0.046, pad=0.04)
+    boundaries = np.where(np.diff(kernel_labels_np) != 0)[0]
+    for b in boundaries:
+        for ax in [axs[0, 0], axs[0, 1], axs[0, 2]]:
+            ax.axhline(b + 0.5, color="white", lw=0.4, alpha=0.7)
+            ax.axvline(b + 0.5, color="white", lw=0.4, alpha=0.7)
 
     axs[1, 0].bar(
         ["MAP", "DNN2GP", "Curvature"],
@@ -301,10 +316,12 @@ def main() -> None:
     axs[1, 0].set_title("Test subset accuracy")
     axs[1, 0].grid(alpha=0.2, axis="y")
 
-    axs[1, 1].hist(entropy_dnn2gp_np, bins=24, alpha=0.6, label="DNN2GP", color="#2ca02c", density=True)
-    axs[1, 1].hist(entropy_curv_np, bins=24, alpha=0.6, label="Curvature", color="#d62728", density=True)
-    axs[1, 1].set_title("Predictive entropy distribution")
-    axs[1, 1].set_xlabel("Entropy")
+    log_ent_dnn2gp = np.log10(np.clip(entropy_dnn2gp_np, a_min=1e-12, a_max=None))
+    log_ent_curv = np.log10(np.clip(entropy_curv_np, a_min=1e-12, a_max=None))
+    axs[1, 1].hist(log_ent_dnn2gp, bins=26, alpha=0.6, label="DNN2GP", color="#2ca02c", density=True)
+    axs[1, 1].hist(log_ent_curv, bins=26, alpha=0.6, label="Curvature", color="#d62728", density=True)
+    axs[1, 1].set_title("Predictive entropy distribution (log10)")
+    axs[1, 1].set_xlabel("log10(entropy)")
     axs[1, 1].set_ylabel("Density")
     axs[1, 1].legend(loc="best")
     axs[1, 1].grid(alpha=0.2)
@@ -313,11 +330,14 @@ def main() -> None:
         [
             f"eval size: {len(y_true_np)}",
             f"kernel size: {len(kernel_j)}",
+            "dataset: MNIST 10 classes",
             f"MC samples: {args.mc_samples}",
             f"acc MAP: {acc_map:.4f}",
             f"acc DNN2GP: {acc_dnn2gp:.4f}",
             f"acc Curvature: {acc_curv:.4f}",
             f"kernel corr (upper tri): {kernel_corr:.4f}",
+            f"entropy mean DNN2GP/Curv: {entropy_dnn2gp_np.mean():.4f} / {entropy_curv_np.mean():.4f}",
+            f"entropy median DNN2GP/Curv: {np.median(entropy_dnn2gp_np):.4f} / {np.median(entropy_curv_np):.4e}",
             f"Lambda trace mean/std: {lambda_trace_np.mean():.4f} / {lambda_trace_np.std():.4f}",
         ]
     )

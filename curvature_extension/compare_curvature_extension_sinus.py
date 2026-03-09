@@ -38,22 +38,33 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--data-dir", type=str, default="data/snelson")
     parser.add_argument("--output-dir", type=str, default="curvature_extension_results")
     parser.add_argument("--n-train", type=int, default=200)
-    parser.add_argument("--n-epochs", type=int, default=12000)
+    parser.add_argument("--n-epochs", type=int, default=20000)
     parser.add_argument("--seed", type=int, default=100)
     parser.add_argument("--sigma-noise", type=float, default=0.286)
     parser.add_argument("--delta", type=float, default=0.1)
     parser.add_argument("--hidden-size", type=int, default=32)
     parser.add_argument("--hidden-layers", type=int, default=1)
-    parser.add_argument("--activation", type=str, default="tanh")
+    parser.add_argument("--activation", type=str, default="sigmoid")
     parser.add_argument("--step-size", type=float, default=0.1)
     parser.add_argument("--dpi", type=int, default=220)
     parser.add_argument("--y-min", type=float, default=-2.7)
     parser.add_argument("--y-max", type=float, default=2.0)
+    parser.add_argument("--x-min", type=float, default=-0.5)
+    parser.add_argument("--x-max", type=float, default=6.5)
+    parser.add_argument(
+        "--ci-multiplier",
+        type=float,
+        default=1.96,
+        help="Gaussian confidence band multiplier (1.96 = 95% interval).",
+    )
     parser.add_argument(
         "--band-clip-quantile",
         type=float,
-        default=97.5,
-        help="Clip predictive variance for display at this quantile (metrics keep raw values).",
+        default=100.0,
+        help=(
+            "Optional display clipping quantile for predictive variance. "
+            "Use 100 to disable clipping and show raw confidence intervals."
+        ),
     )
     return parser.parse_args()
 
@@ -95,7 +106,7 @@ def main() -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     X_train, y_train = load_snelson_subset(data_dir=data_dir, n_train=args.n_train, seed=args.seed)
-    X_test = np.linspace(-4.0, 10.0, 1000)[:, None]
+    X_test = np.linspace(args.x_min, args.x_max, 1000)[:, None]
 
     primal_nn = NeuralNetworkRegression(
         X_train,
@@ -161,12 +172,24 @@ def main() -> None:
 
     var_tot_orig = np.clip(var_orig + args.sigma_noise**2, a_min=0.0, a_max=None)
     var_tot_curv = np.clip(var_curv + args.sigma_noise**2, a_min=0.0, a_max=None)
+    raw_std_orig = np.sqrt(var_tot_orig)
+    raw_std_curv = np.sqrt(var_tot_curv)
     q = float(args.band_clip_quantile)
-    clip_orig = np.percentile(var_tot_orig, q)
-    clip_curv = np.percentile(var_tot_curv, q)
-    # Plot-clipped bands improve readability; raw uncertainty is kept in metrics JSON.
-    pred_std_orig = np.sqrt(np.clip(var_tot_orig, a_min=0.0, a_max=clip_orig))
-    pred_std_curv = np.sqrt(np.clip(var_tot_curv, a_min=0.0, a_max=clip_curv))
+    if q >= 100.0:
+        clip_orig = float(np.max(var_tot_orig))
+        clip_curv = float(np.max(var_tot_curv))
+        pred_std_orig = np.sqrt(var_tot_orig)
+        pred_std_curv = np.sqrt(var_tot_curv)
+    else:
+        clip_orig = np.percentile(var_tot_orig, q)
+        clip_curv = np.percentile(var_tot_curv, q)
+        # Optional clipping for readability only; raw uncertainty remains in metrics.
+        pred_std_orig = np.sqrt(np.clip(var_tot_orig, a_min=0.0, a_max=clip_orig))
+        pred_std_curv = np.sqrt(np.clip(var_tot_curv, a_min=0.0, a_max=clip_curv))
+
+    ci_mult = float(args.ci_multiplier)
+    outside_mask = (X_test[:, 0] < float(X_train[:, 0].min())) | (X_test[:, 0] > float(X_train[:, 0].max()))
+    inside_mask = ~outside_mask
     rmse_map_train = float(np.sqrt(np.mean((map_mean_train - y_train) ** 2)))
     rmse_orig_train = float(np.sqrt(np.mean((mean_orig_train - y_train) ** 2)))
     rmse_curv_train = float(np.sqrt(np.mean((mean_curv_train - y_train) ** 2)))
@@ -180,22 +203,22 @@ def main() -> None:
     ax.plot(X_test[:, 0], map_mean_test, color="#1f77b4", lw=2.0, label="MAP mean (shared)")
     ax.fill_between(
         X_test[:, 0],
-        map_mean_test - pred_std_orig,
-        map_mean_test + pred_std_orig,
+        map_mean_test - ci_mult * pred_std_orig,
+        map_mean_test + ci_mult * pred_std_orig,
         color="#1f77b4",
         alpha=0.18,
-        label="original DNN2GP ±1 std band",
+        label=f"original DNN2GP ±{ci_mult:.2f} std band",
     )
     ax.plot(X_test[:, 0], map_mean_test, color="#d62728", lw=1.7, ls="--", label="curvature extension (same mean)")
     ax.fill_between(
         X_test[:, 0],
-        map_mean_test - pred_std_curv,
-        map_mean_test + pred_std_curv,
+        map_mean_test - ci_mult * pred_std_curv,
+        map_mean_test + ci_mult * pred_std_curv,
         color="#d62728",
         alpha=0.16,
-        label="curvature-weighted ±1 std band",
+        label=f"curvature-weighted ±{ci_mult:.2f} std band",
     )
-    ax.set_xlim(-4.0, 10.0)
+    ax.set_xlim(args.x_min, args.x_max)
     ax.set_ylim(args.y_min, args.y_max)
     ax.set_xlabel("x")
     ax.set_ylabel("y")
@@ -211,6 +234,7 @@ def main() -> None:
             f"mean epistemic std (curv): {mean_epistemic_std_curv:.4f}",
             f"Lambda mean/std: {float(np.mean(Ss_train)):.4f} / {float(np.std(Ss_train)):.2e}",
             f"kernel scale k_curv/k_orig: {kernel_scale_median:.4f}",
+            f"CI multiplier: {ci_mult:.2f}",
             f"band clip quantile: {q:.1f}%",
         ]
     )
@@ -231,6 +255,10 @@ def main() -> None:
     plt.close(fig)
 
     metrics = {
+        "x_test_min": float(args.x_min),
+        "x_test_max": float(args.x_max),
+        "x_train_min": float(X_train[:, 0].min()),
+        "x_train_max": float(X_train[:, 0].max()),
         "lambda_scalar_mean": float(np.mean(Ss_train)),
         "lambda_scalar_std": float(np.std(Ss_train)),
         "is_lambda_effectively_constant": bool(np.std(Ss_train) < 1e-12),
@@ -247,6 +275,16 @@ def main() -> None:
         "train_rmse_curvature": rmse_curv_train,
         "mean_epistemic_std_original": mean_epistemic_std_orig,
         "mean_epistemic_std_curvature": mean_epistemic_std_curv,
+        "raw_std_mean_outside_original": float(raw_std_orig[outside_mask].mean()),
+        "raw_std_mean_outside_curvature": float(raw_std_curv[outside_mask].mean()),
+        "raw_std_mean_inside_original": float(raw_std_orig[inside_mask].mean()),
+        "raw_std_mean_inside_curvature": float(raw_std_curv[inside_mask].mean()),
+        "clipped_std_mean_outside_original": float(pred_std_orig[outside_mask].mean()),
+        "clipped_std_mean_outside_curvature": float(pred_std_curv[outside_mask].mean()),
+        "display_clip_quantile": q,
+        "display_clip_var_original": float(clip_orig),
+        "display_clip_var_curvature": float(clip_curv),
+        "ci_multiplier": ci_mult,
         "note": (
             "For scalar Gaussian regression in this codepath, Lambda is constant 1/sigma_noise^2. "
             "So curvature weighting introduces a global kernel scaling but no new x-dependent structure. "

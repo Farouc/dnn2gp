@@ -1,0 +1,33 @@
+{
+  "experiment": "curvature_synthetic_2d_binary",
+  "device": "cpu",
+  "seed": 123,
+  "n_train": 3000,
+  "n_test": 2500,
+  "laplace_train_size": 1200,
+  "grid_size": 101,
+  "center_radius": 1.5,
+  "map_train_accuracy": 0.865,
+  "map_test_accuracy": 0.8684,
+  "dnn2gp_test_accuracy": 0.8672,
+  "curvature_test_accuracy": 0.868,
+  "entropy_center_dnn2gp": 0.6207206555021244,
+  "entropy_outer_dnn2gp": 0.18303254399599214,
+  "entropy_center_curvature": 0.6363952573439757,
+  "entropy_outer_curvature": 0.20456942098697675,
+  "entropy_center_diff_curvature_minus_dnn2gp": 0.01567460184185132,
+  "entropy_outer_diff_curvature_minus_dnn2gp": 0.02153687699098461,
+  "kernel_corr_upper_tri_normalized": 0.9937420559261653,
+  "lambda_trace_grid_mean": 0.16605002679120845,
+  "lambda_trace_grid_std": 0.18901344291908065,
+  "true_lambda_scalar_grid_mean": 0.08443021242490666,
+  "true_lambda_scalar_grid_std": 0.09513458090611299,
+  "quick_take_accuracy": "accuracy is similar",
+  "quick_take_uncertainty": "curvature is broadly more uncertain",
+  "figures": {
+    "dataset": "/mnt/D/mva_P2/Bayesian_ML/project/results/curvature_synthetic_2d/dataset_true_probability_and_train_points.png",
+    "probability_comparison": "/mnt/D/mva_P2/Bayesian_ML/project/results/curvature_synthetic_2d/predictive_probability_dnn2gp_vs_curvature.png",
+    "entropy_comparison": "/mnt/D/mva_P2/Bayesian_ML/project/results/curvature_synthetic_2d/predictive_entropy_dnn2gp_vs_curvature.png",
+    "lambda_map": "/mnt/D/mva_P2/Bayesian_ML/project/results/curvature_synthetic_2d/lambda_variation_map.png"
+  }
+}

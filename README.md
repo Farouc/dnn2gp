@@ -9,7 +9,7 @@ Authors:
 
 ## Overview
 
-The project impelemnts the paper "Approximate Inference Turns Neural Networks to Gaussian Processes", while doing some the following:
+The project impelemnts the paper "Approximate Inference Turns Neural Networks to Gaussian Processes", while doing the following:
 - Laplace / DNN2GP experiments
 - Variational baselines (VOGN / OGGN)
 - Marginal-likelihood hyperparameter sweeps

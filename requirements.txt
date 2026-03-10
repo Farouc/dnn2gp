@@ -1,0 +1,13 @@
+numpy
+scipy
+pandas
+matplotlib
+seaborn
+plotly
+scikit-learn
+torch
+torchvision
+tqdm
+brewer2mpl
+jupyter
+ipykernel

@@ -1,0 +1,19 @@
+{
+  "dataset": "Fashion-MNIST (small subset)",
+  "device": "cuda",
+  "map_checkpoint": "/mnt/D/mva_P2/Bayesian_ML/project/results/curvature_extension/fashion_mnist_curvature_extension/fashion_mnist_lenet_map_train12000_seed123.pt",
+  "train_size": 12000,
+  "laplace_train_size": 2000,
+  "eval_size": 1000,
+  "kernel_size": 120,
+  "mc_samples": 50,
+  "accuracy_map": 0.774,
+  "accuracy_dnn2gp": 0.772,
+  "accuracy_curvature_extension": 0.759,
+  "kernel_corr_upper_tri_normalized": 0.8713431133535295,
+  "entropy_mean_dnn2gp": 0.638844930582479,
+  "entropy_mean_curvature": 0.7316300709857897,
+  "lambda_trace_mean": 0.31031512209945517,
+  "lambda_trace_std": 0.2661615548849258,
+  "figure_path": "/mnt/D/mva_P2/Bayesian_ML/project/results/curvature_extension/fashion_mnist_curvature_extension/fashion_mnist_small_dnn2gp_vs_curvature_extension.png"
+}

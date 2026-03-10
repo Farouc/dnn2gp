@@ -1,0 +1,15 @@
+{
+  "kernel_corr_recomputed": 0.8715473219332164,
+  "acc_map": 0.991,
+  "acc_dnn2gp": 0.99,
+  "acc_curvature": 0.992,
+  "agreement_map_vs_dnn2gp": 0.999,
+  "agreement_map_vs_curvature": 0.999,
+  "agreement_dnn2gp_vs_curvature": 0.998,
+  "entropy_mean_dnn2gp": 0.01292718373831153,
+  "entropy_mean_curvature": 0.026533171672206292,
+  "entropy_median_dnn2gp": 1.223194732936832e-06,
+  "entropy_median_curvature": 1.2229381622193965e-06,
+  "lambda_trace_mean": 0.0033722344557905993,
+  "lambda_trace_std": 0.029602956186917908
+}
